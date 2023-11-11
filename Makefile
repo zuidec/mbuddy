@@ -9,9 +9,12 @@ endif
 # Directories
 
 ROOT_DIR		= ./
+INSTALL_DIR		= ~/bin/
 SRC_DIR			= source
 INC_DIR			= include
 OBJ_DIR			= obj
+BIN_DIR			= bin
+TEST_DIR		= test
 
 BINARY_NAME		= mbuddy
 
@@ -56,9 +59,14 @@ CSTD			?= -std=gnu99
 ###############################################################################
 # Source files
 
+SRCS			+= $(SRC_DIR)/$(BINARY_NAME).c
+SRCS			+= $(SRC_DIR)/nix_serial.c
+SRCS			+= $(SRC_DIR)/gui.c
 
-OBJS			+= $(BINARY_NAME).o
+OBJS 			+= $(SRCS:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
 
+SERIALTEST_OBJS	+= $(OBJ_DIR)/serialtest.o
+SERIALTEST_OBJS	+= $(OBJ_DIR)/nix_serial.o
 
 ###############################################################################
 # C flags
@@ -92,14 +100,30 @@ LDLIBS			+= -Wl,--start-group -lc -lgcc  -Wl,--end-group
 ###############################################################################
 ###############################################################################
 ###############################################################################
-
 .SUFFIXES: .elf .bin .hex .srec .list .map .images
 .SECONDEXPANSION:
 .SECONDARY:
 
-all: $(BINARY_NAME) 
+all: $(BIN_DIR)/$(BINARY_NAME)
+	$(Q)echo "\nBuild complete\n\tout: $(BIN_DIR)/$(BINARY_NAME)\n"
 
-GENERATED_BINARIES = $(BINARY_NAME)
+install: $(BIN_DIR)/$(BINARY_NAME)
+	$(Q)cp $(BIN_DIR)/$(BINARY_NAME) $(INSTALL_DIR)
+	$(Q)echo "\nInstall complete, run with the command $(BINARY_NAME)\n"
+
+debug: DEFS += -DDEBUG
+debug: all
+	$(Q)echo "\nBuild completed in DEBUG mode\n"
+
+serialtest: $(BIN_DIR)/serialtest
+
+$(BIN_DIR)/serialtest:
+	$(Q)$(CC) $(TGT_CFLAGS) $(CFLAGS) $(TGT_CPPFLAGS) $(CPPFLAGS) -o $(OBJ_DIR)/serialtest.o -c $(TEST_DIR)/serialtest.c
+	$(Q)$(CC) $(TGT_CFLAGS) $(CFLAGS) $(TGT_CPPFLAGS) $(CPPFLAGS) -o $(OBJ_DIR)/nix_serial.o -c $(SRC_DIR)/nix_serial.c
+	$(Q)$(CC) $(SERIALTEST_OBJS) -o $(BIN_DIR)/serialtest
+
+
+GENERATED_BINARIES = $(BIN_DIR)/$(BINARY_NAME) $(BIN_DIR)/serialtest
 
 # Define a helper macro for debugging make errors online
 # you can type "make print-OPENCM3_DIR" and it will show you
@@ -109,33 +133,31 @@ GENERATED_BINARIES = $(BINARY_NAME)
 print-%:
 	$(Q)echo $*=$($*)
 
-$(BINARY_NAME): $(OBJ_DIR)/$(OBJS)
-	$(Q)printf "  LD		$(OBJ_DIR)/$(OBJS)\n"
-	$(Q)$(LD) $(TGT_LDFLAGS) $(LDFLAGS) $(OBJ_DIR)/$(OBJS) $(LDLIBS) -o $(BINARY_NAME)
+$(BIN_DIR)/$(BINARY_NAME): $(OBJS)
+	$(Q)#printf "  LD	  $(OBJS)\n"
+	$(Q)$(LD) $(TGT_LDFLAGS) $(LDFLAGS) $(OBJS) $(LDLIBS) -o $(BIN_DIR)/$(BINARY_NAME)
 
-$(OBJ_DIR)/$(OBJS): $(SRC_DIR)/$(OBJS)
-	$(Q)mv $(SRC_DIR)/*.o $(OBJ_DIR)/
-	$(Q)mv $(SRC_DIR)/*.d $(OBJ_DIR)/
-
-#$(OBJS): $(SRC_DIR)/%.o
+$(OBJS): $(SRCS)
+	$(Q)#printf "  CC      $(*:obj/%=source/%).c\n"
+	$(Q)$(CC) $(TGT_CFLAGS) $(CFLAGS) $(TGT_CPPFLAGS) $(CPPFLAGS) -o $(*).o -c $(*:obj/%=source/%).c
 
 %.o: %.c
-	$(Q)printf "  CC      $(*).c\n"
+	$(Q)#printf "  CC      $(*).c\n"
 	$(Q)$(CC) $(TGT_CFLAGS) $(CFLAGS) $(TGT_CPPFLAGS) $(CPPFLAGS) -o $(*).o -c $(*).c
 
 %.o: %.cxx
-	$(Q)printf "  CXX     $(*).cxx\n"
+	$(Q)#printf "  CXX     $(*).cxx\n"
 	$(Q)$(CXX) $(TGT_CXXFLAGS) $(CXXFLAGS) $(TGT_CPPFLAGS) $(CPPFLAGS) -o $(*).o -c $(*).cxx
 
 %.o: %.cpp
-	$(Q)printf "  CXX     $(*).cpp\n"
+	$(Q)#printf "  CXX     $(*).cpp\n"
 	$(Q)$(CXX) $(TGT_CXXFLAGS) $(CXXFLAGS) $(TGT_CPPFLAGS) $(CPPFLAGS) -o $(*).o -c $(*).cpp
 
 clean:
-	@#printf "  CLEAN\n"
-	$(Q)$(RM) $(GENERATED_BINARIES) generated.* $(OBJ_DIR)/$(OBJS) $(OBJ_DIR)/$(OBJS:%.o=%.d)
+	$(Q)#printf "  CLEAN\n"
+	$(Q)$(RM) $(GENERATED_BINARIES) $(OBJ_DIR)/*.o $(OBJ_DIR)/*.d
 
 
-.PHONY: images clean elf bin hex srec list
+.PHONY: install debug images clean elf bin hex srec list
 
 -include $(OBJS:.o=.d)
