@@ -1,3 +1,8 @@
 mbuddy
 *.o
 *.d
+serialtest
+serialtest.c
+compile_commands.json
+buildtest.sh
+.cache
