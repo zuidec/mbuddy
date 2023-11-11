@@ -1,3 +1,10 @@
+/*
+ *	nix_serial.c
+ *	Library to access serial linux serial ports
+ *
+ *	Created by zuidec on 11/11/23
+ */
+
 #include <stdio.h>
 #include <string.h>
 
