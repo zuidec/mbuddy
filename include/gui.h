@@ -37,14 +37,15 @@ typedef struct _win_border_struct   {
 
 typedef struct WIN_PARAMS   {
     int height, width;
-    int x_pos, y_pos;
+    int y_pos, x_pos;
+    int max_y, max_x;
 } WIN_PARAMS;
 
 typedef struct status_bar_t    {
     char* port;
     int baudrate;
-    WINDOW* window;
     char* exit_msg;
+    bool is_connected;
 } status_bar_t;
 
 
@@ -52,11 +53,18 @@ typedef struct status_bar_t    {
  *  Function prototypes
  */
 
-WINDOW* init_window(WIN_PARAMS* params);
-void init_window_params(WIN_PARAMS* main_params, WIN_PARAMS* input_params, WIN_PARAMS* status_params);
-void update_status_bar(status_bar_t* status_bar, WIN_PARAMS* status_params);
-void update_input_box(WINDOW* input_box, char* data);
+void init_gui(void);
+void close_gui(void);
+void update_status_bar(status_bar_t* status_bar);
+void update_input_box(char* data);
+void move_input_cursor(int distance);
 int get_input(char* buffer);
+int get_input_box_width(void);
+int get_input_box_char(void);
+bool screen_size_changed(void);
+void init_colors(void);
+void print_main(const char* data);
+void clear_main(void);
 
 #endif  // END GUI_H
 

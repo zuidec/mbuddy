@@ -5,6 +5,7 @@
  *	Created by zuidec on 11/11/23
  */
 
+#include <curses.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -13,10 +14,11 @@
 #include "nix_serial.h"
 
 #define DEFAULT_BAUDRATE    (115200)
-#define DEFAULT_PORT        ("dev/ttyUSB0")
+#define DEFAULT_PORT        ("/dev/ttyUSB0")
 
 static void print_usage(void);
-static bool is_backspace(int code);
+static bool is_backspace(int key);
+static bool is_special_key(int key);
 
 const char* cmd = "mbuddy";
 
@@ -52,74 +54,51 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    // Create param structs for the GUI windows
-    WIN_PARAMS main_params, input_params, status_params;
-    
-    // Initialize the screen, allow CTRL-C to escape, disable echo
-    initscr();
-    cbreak();
-    noecho();
-    //start_color();
-    
-    // Initialize window parameters to default parameters
-    init_window_params(&main_params, &input_params,&status_params);
-    // Then initialize the windows themselves
-    WINDOW* main_window = init_window(&main_params);
-    WINDOW* input_window = init_window(&input_params);
-    WINDOW* status_bar = init_window(&status_params);
-    
-    // Allow keypad in the input window
-    keypad(input_window, true);
+    init_gui();
 
-    // Update the status bar
-    status_bar_t status = {port, baudrate, status_bar, "Press F1 to exit"};
-    update_status_bar(&status, &status_params);
-    
-    for(int i =0; i< argc; i++) {
-        mvwprintw(main_window,i+2, 2, "Argument %i is %s", i, argv[i]);
-        wrefresh(main_window);
+
+    // Initialize status bar settings
+    status_bar_t status = {port, baudrate, "Press F1 to exit", false};
+
+    serial_handle_t  serial_port = init_serial_port(port, baudrate);
+    if(serial_port >= 0) {
+        status.is_connected = true;
     }
-    
-    mvwprintw(input_window, 1, COLUMN_OFFSET, "> ");
-    wrefresh(input_window);
+    update_status_bar(&status);    
 
-    int input_size = input_params.width-1-(COLUMN_OFFSET * 3);
+    // Update the input box
+    update_input_box("");
+    
+    // Set up the entry buffer and indexing
+    int input_size = get_input_box_width();
     char input_data[input_size];
     memset(&input_data[0], '\0', input_size);
     int input_index = 0;
-    uint32_t ch = 0;
 
-    while((ch = wgetch(input_window)) != KEY_F(1))   {
+    int ch = 0;
 
-        if(input_index < input_size && !is_backspace(ch))   {
+    while((ch = get_input_box_char()) != KEY_F(1))   {
+
+        if(input_index < input_size && !is_special_key(ch))   {
             input_data[input_index] = ch;
             input_index++;
-            int y, x;
-            getyx(input_window,y,x);
-            wmove(input_window,y, x++); 
-            update_input_box(input_window, &input_data[0]);
+            move_input_cursor(1);
+            update_input_box(&input_data[0]);
         }
         
         if(is_backspace(ch) && input_index > 0) {
             
             input_index--;
             input_data[input_index] = '\0';
-            int y, x;
-            getyx(input_window,y,x);
-            wmove(input_window,y, x--);
-            update_input_box(input_window, &input_data[0]);
+            move_input_cursor(-1);
+            update_input_box(&input_data[0]);
 
         }
     }
 
+    close_serial_port(serial_port);
     endwin(); 
     return 0;
-}
-
-int get_input(char* buffer) {
-    int bytes_read = 0;
-
-    return bytes_read;
 }
 
 static void print_usage(void)   {
@@ -130,14 +109,22 @@ static void print_usage(void)   {
     printf("\t-b baudrate\t\tDefault is %i\n", DEFAULT_BAUDRATE); 
 }
 
-static bool is_backspace(int code)  {
+static bool is_backspace(int key)  {
     
-    if(code==KEY_BACKSPACE) {
+    if(key==KEY_BACKSPACE) {
         return true;
     }
-    if(code==8) {
+    if(key==8) {
         return true;
     }
 
     return false;
 }
+
+static bool is_special_key(int key) {
+    if(is_backspace(key))    {
+            return true;
+    }
+    return false;
+ }
+
