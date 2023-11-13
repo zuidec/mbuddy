@@ -21,6 +21,7 @@ static bool is_backspace(int key);
 static bool is_special_key(int key);
 
 const char* cmd = "mbuddy";
+char* exit_msg = "Press F1 to exit";
 
 int main(int argc, char *argv[]) {
     
@@ -56,9 +57,8 @@ int main(int argc, char *argv[]) {
 
     init_gui();
 
-
     // Initialize status bar settings
-    status_bar_t status = {port, baudrate, "Press F1 to exit", false};
+    status_bar_t status = {port, baudrate, exit_msg, false};
 
     serial_handle_t  serial_port = init_serial_port(port, baudrate);
     if(serial_port >= 0) {
@@ -74,11 +74,14 @@ int main(int argc, char *argv[]) {
     char input_data[input_size];
     memset(&input_data[0], '\0', input_size);
     int input_index = 0;
-
+    char serial_input_buffer[256];
     int ch = 0;
+    int bytes_read = 0;
 
-    while((ch = get_input_box_char()) != KEY_F(1))   {
+    while(ch != KEY_F(1))   {
 
+        if(new_input_box_char())    {
+            ch = get_input_box_char();
         if(input_index < input_size && !is_special_key(ch))   {
             input_data[input_index] = ch;
             input_index++;
@@ -94,6 +97,13 @@ int main(int argc, char *argv[]) {
             update_input_box(&input_data[0]);
 
         }
+        
+        bytes_read = serial_read(serial_port, &serial_input_buffer[0], sizeof(serial_input_buffer));
+        if(bytes_read > 0)  {
+        //    update_main_window(&serial_input_buffer[0], bytes_read);
+            bytes_read = 0;
+        }
+    }
     }
 
     close_serial_port(serial_port);
@@ -122,9 +132,10 @@ static bool is_backspace(int key)  {
 }
 
 static bool is_special_key(int key) {
-    if(is_backspace(key))    {
-            return true;
+    if(key>=32 && key<=127) {
+        return false;
     }
-    return false;
+    
+    return true;
  }
 

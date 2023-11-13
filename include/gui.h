@@ -22,6 +22,8 @@
 #define INPUT_BOX_HEIGHT    (3)
 #define COLUMN_OFFSET       (2)
 #define NO_COLUMN_OFFSET    (0)
+#define WINDOW_PADDING      (4)
+#define MAIN_INDEX_OFFSET   (2)
 #define STATUS_BAR_HEIGHT   (2)
 #define MAX_ARGS            (5)
 
@@ -37,7 +39,7 @@ typedef struct _win_border_struct   {
 
 typedef struct WIN_PARAMS   {
     int height, width;
-    int y_pos, x_pos;
+    int start_y, start_x;
     int max_y, max_x;
 } WIN_PARAMS;
 
@@ -61,9 +63,9 @@ void move_input_cursor(int distance);
 int get_input(char* buffer);
 int get_input_box_width(void);
 int get_input_box_char(void);
+bool new_input_box_char(void);
 bool screen_size_changed(void);
-void init_colors(void);
-void print_main(const char* data);
+void update_main_window(const char* data, int size);
 void clear_main(void);
 
 #endif  // END GUI_H
