@@ -32,7 +32,7 @@
 #define YELLOW          (14)
 #define B_WHITE         (15)
 
-#define STATUS_RED      (0)
+#define STATUS_RED      (3)
 #define STATUS_GREEN    (1)
 #define STATUS_NORM     (2)
 #define MAIN_WINDOW_START_LN    (2)
@@ -64,7 +64,7 @@ static void init_window_params(void)  {
     main_params.max_y      = max_y;
     main_params.max_x      = max_x;
     main_params.width      = max_x- COLUMN_OFFSET;
-    main_params.height     = (max_y - INPUT_BOX_HEIGHT - STATUS_BAR_HEIGHT - 1);
+    main_params.height     = max_y - INPUT_BOX_HEIGHT - STATUS_BAR_HEIGHT;
     main_params.start_x    = COLUMN_OFFSET;
     main_params.start_y    = 0;
 
@@ -73,14 +73,14 @@ static void init_window_params(void)  {
     input_params.width     = max_x - COLUMN_OFFSET;
     input_params.height    = INPUT_BOX_HEIGHT;
     input_params.start_x   = COLUMN_OFFSET;
-    input_params.start_y   = max_y - INPUT_BOX_HEIGHT - STATUS_BAR_HEIGHT -1;
+    input_params.start_y   = max_y - INPUT_BOX_HEIGHT - STATUS_BAR_HEIGHT;
 
     status_params.max_y    = max_y;
     status_params.max_x    = max_x;
-    status_params.width    = max_x -1;
+    status_params.width    = max_x;
     status_params.height   = STATUS_BAR_HEIGHT;
     status_params.start_x  = NO_COLUMN_OFFSET; 
-    status_params.start_y  = max_y - STATUS_BAR_HEIGHT - 1;
+    status_params.start_y  = max_y - STATUS_BAR_HEIGHT;
 }
 
 static WINDOW* init_window(WIN_PARAMS* params)   {
@@ -88,7 +88,9 @@ static WINDOW* init_window(WIN_PARAMS* params)   {
 
     // Use window parameters to create and return a pointer to a new windown
     window = newwin(params->height, params->width, params->start_y, params->start_x);
-    box(window, 0, 0); 
+    if(params->height!=STATUS_BAR_HEIGHT)   {
+        box(window, 0, 0); 
+    }
     wrefresh(window);
 
     return window;
@@ -145,20 +147,25 @@ void update_status_bar(status_bar_t* status_bar) {
     
     // Clear then reprint data
     wclear(status_window);
-    mvwprintw(status_window, 1, COLUMN_OFFSET, "Press F1 to exit");
+    sprintf(&msg[0], "(F1) Exit  (F2) Port: %s  (F3) Baudrate: %i", status_bar->port, status_bar->baudrate);
+    mvwprintw(status_window, 1, COLUMN_OFFSET, "%s", msg);
+    memset(msg, '\0', sizeof(msg));
 
+    // Set color of connection based on status
     if(status_bar->is_connected)    {
+        sprintf(&msg[0], "Connection OK  ");
         wattr_on(status_window, COLOR_PAIR(STATUS_GREEN), NULL);
-        sprintf(&msg[0], "Connection OK Port: %s  Baudrate: %i", status_bar->port, status_bar->baudrate);
-        mvwprintw(status_window, 1, (status_params.width - strlen(msg)), "%s", &msg[0]);
+        mvwprintw(status_window,1, status_params.width - (strlen(msg)), "%s", &msg[0]);
         wattr_off(status_window, COLOR_PAIR(STATUS_GREEN), NULL);
     }
     else    {
-        wattron(status_window, COLOR_PAIR(STATUS_RED));
-        sprintf(&msg[0], "Connection FAIL Port: %s  Baudrate: %i", status_bar->port, status_bar->baudrate);
-        mvwprintw(status_window, 1, (status_params.width - strlen(msg)), "%s", &msg[0]);
-        wattroff(status_window, COLOR_PAIR(STATUS_RED));
+        sprintf(&msg[0], "Connection FAIL  ");
+        wattr_on(status_window, COLOR_PAIR(STATUS_RED), NULL);
+        mvwprintw(status_window,1, status_params.width - (strlen(msg)), "%s", &msg[0]);
+        wattr_off(status_window, COLOR_PAIR(STATUS_RED), NULL);
     }
+
+    // Put cursor back into input window and refresh
     wmove(input_window, 1, input_box_index);
     wrefresh(status_window);
 }
@@ -193,45 +200,46 @@ bool new_input_box_char(void)   {
 }
 
 void update_main_window(const char *data, int size)  {
-
+    
+    // Get the available height/width for printing
     int window_height = main_params.height-MAIN_INDEX_OFFSET; 
     int window_width = main_params.width - WINDOW_PADDING;
-
+    
+    // Make a temporary buffer to store each line as it's moved
     chtype current_line[window_width];
     memset(&current_line[0], '\0', window_width);
+
     int bytes_written = 0;
 
-    //char msg[64];
-    //sprintf(msg, "W: %i H: %i", window_width, window_height);
-    //update_input_box(msg);
-    //mvwprintw(main_window, 1, 3, "%s",msg );
-    //mvwprintw(main_window, 1, 1, "%c",'x');
-    //mvwprintw(main_window, 1, window_width, "%c",'x');
-    //mvwprintw(main_window, window_height, window_width, "%c",'x');
-    //mvwprintw(main_window, window_height, 1, "%c",'x');
-
+    // Loop while there is still data to output
     while(bytes_written < size) {
-
+        
+        // Stay within this loop as long as the end of line isn't reached
         while(main_window_index < window_width && bytes_written < size)  {
-
+            
+            // Shift everything if a newline character is received
             if(data[bytes_written]=='\n')   {
                 
+                // Reset window index and increment the write index
                 main_window_index = MAIN_INDEX_OFFSET; 
                 bytes_written++;
-
+                
                 for(int i=2; i<= window_height; i++)    {
-                    
+                    // Grab one line at a time, copy it, shift it up, then move
+                    // down, etc.. until all lines are shifted
                     mvwinchnstr(main_window,i, MAIN_INDEX_OFFSET, &current_line[0], window_width);
                     wmove(main_window, i-1, MAIN_INDEX_OFFSET);
                     waddchnstr(main_window, &current_line[0], window_width);
                     memset(&current_line[0], '\0', window_width);
-                    
                 }
+
+                // Clear the last line before printing more characters
                 for(int i=MAIN_INDEX_OFFSET; i< window_width; i++)    {
                     mvwprintw(main_window, window_height, i, " ");
                 }
             }
-
+            
+            // Write one character at a time to the bottom line
             else    {
                 mvwprintw(main_window, window_height, main_window_index,"%c", data[bytes_written]);
                 main_window_index++;
@@ -240,22 +248,25 @@ void update_main_window(const char *data, int size)  {
         }
         
         if(main_window_index==window_width) {
+            // Reset window index and increment the write index
             main_window_index = MAIN_INDEX_OFFSET; 
-
+            
             for(int i=2; i<= window_height; i++)    {
-                
+                // Grab one line at a time, copy it, shift it up, then move
+                // down, etc.. until all lines are shifted
                 mvwinchnstr(main_window,i, MAIN_INDEX_OFFSET, &current_line[0], window_width);
                 wmove(main_window, i-1, MAIN_INDEX_OFFSET);
                 waddchnstr(main_window, &current_line[0], window_width);
                 memset(&current_line[0], '\0', window_width);
-                
             }
+
+            // Clear the last line before printing more characters
             for(int i=MAIN_INDEX_OFFSET; i< window_width; i++)    {
                 mvwprintw(main_window, window_height, i, " ");
             }
         }
-
     }
+    // Move the cursor back to the input window and refresh
     wmove(input_window, 1, input_box_index);
     wrefresh(main_window);
 }
@@ -273,20 +284,14 @@ bool screen_size_changed(void)  {
 }
 
 static void init_colors(void)  {
-
+    
+    // Hypotheticall initializes all combos of the 256 colors FG + BG,
+    // but COLOR_PAIR() can only go to 255
     for(int j=-1; j< 256; j++)   {
 
         for(int i=0; i< 256; i++)   {
 
             init_extended_pair((i+(256*(j+1))), i, j);
-            /*
-            if(j==0) {
-                init_extended_pair((i+(256*j)), i, -1);
-            }
-            else {
-                init_extended_pair((i+(256*j)), i, j);
-            }
-            */
         }
     }
     init_extended_pair(STATUS_NORM, 231, 238);
@@ -298,7 +303,7 @@ static void set_status_colors(void) {
 
     // Set status bar color pairs
     init_pair(STATUS_NORM, 231, 238);
-    init_pair(STATUS_RED, 196, 238);
+    init_pair(STATUS_RED, 160, 238);
     init_pair(STATUS_GREEN, 46, 238);
 }
 
