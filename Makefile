@@ -21,7 +21,7 @@ BINARY_NAME		= mbuddy
 ###############################################################################
 # Basic Device Setup
 
-#DEFS			+= -D
+DEFS			+= -D_DEFAULT_SOURCE -D_XOPEN_SOURCE=600
 ARFLAGS 		= rcs
 ARCH_FLAGS		= 
 
@@ -29,7 +29,7 @@ ARCH_FLAGS		=
 # Linkerscript
 
 #LDSCRIPT		=
-LDLIBS			+= -lncursesw
+LDLIBS			+= -lncursesw -ltinfo
 #LDFLAGS		+= -L
 
 ###############################################################################
