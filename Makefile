@@ -29,7 +29,7 @@ ARCH_FLAGS		=
 # Linkerscript
 
 #LDSCRIPT		=
-LDLIBS			+= -lncurses
+LDLIBS			+= -lncursesw
 #LDFLAGS		+= -L
 
 ###############################################################################
@@ -76,6 +76,7 @@ TGT_CFLAGS		+= $(ARCH_FLAGS)
 TGT_CFLAGS		+= -Wextra -Wshadow -Wimplicit-function-declaration
 TGT_CFLAGS		+= -Wredundant-decls -Wmissing-prototypes -Wstrict-prototypes
 TGT_CFLAGS		+= -fno-common -ffunction-sections -fdata-sections
+TGT_CFLAGS		+= -Wno-unused-value -Wno-unused-parameter -Wno-unused-function
 
 ###############################################################################
 # C++ flags
