@@ -12,7 +12,7 @@
  *  Includes
  */
 
-#include <ncurses.h>
+#include <ncursesw/ncurses.h>
 
 
 /*

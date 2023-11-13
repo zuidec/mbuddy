@@ -5,7 +5,7 @@
  *	Created by zuidec on 11/11/23
  */
 
-#include <curses.h>
+#include <ncursesw/ncurses.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -75,6 +75,7 @@ int main(int argc, char *argv[]) {
     memset(&input_data[0], '\0', input_size);
     int input_index = 0;
     char serial_input_buffer[256];
+    memset(&serial_input_buffer[0],'\0', 256);
     int ch = 0;
     int bytes_read = 0;
 
@@ -82,28 +83,29 @@ int main(int argc, char *argv[]) {
 
         if(new_input_box_char())    {
             ch = get_input_box_char();
-        if(input_index < input_size && !is_special_key(ch))   {
-            input_data[input_index] = ch;
-            input_index++;
-            move_input_cursor(1);
-            update_input_box(&input_data[0]);
-        }
-        
-        if(is_backspace(ch) && input_index > 0) {
+            if(input_index < input_size && !is_special_key(ch))   {
+                input_data[input_index] = ch;
+                input_index++;
+                move_input_cursor(1);
+                update_input_box(&input_data[0]);
+            }
             
-            input_index--;
-            input_data[input_index] = '\0';
-            move_input_cursor(-1);
-            update_input_box(&input_data[0]);
+            if(is_backspace(ch) && input_index > 0) {
+                
+                input_index--;
+                input_data[input_index] = '\0';
+                move_input_cursor(-1);
+                update_input_box(&input_data[0]);
 
+            }
         }
-        
+
         bytes_read = serial_read(serial_port, &serial_input_buffer[0], sizeof(serial_input_buffer));
         if(bytes_read > 0)  {
-        //    update_main_window(&serial_input_buffer[0], bytes_read);
+            update_main_window(&serial_input_buffer[0], bytes_read);
             bytes_read = 0;
+            memset(&serial_input_buffer[0],'\0', 256);
         }
-    }
     }
 
     close_serial_port(serial_port);

@@ -7,6 +7,7 @@
 
 #include <bits/stdint-uintn.h>
 #include <curses.h>
+#include <ncursesw/ncurses.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <wchar.h>
@@ -31,15 +32,18 @@
 #define YELLOW          (14)
 #define B_WHITE         (15)
 
-#define STATUS_RED      (256)
-#define STATUS_GREEN    (257)
-#define STATUS_NORM     (258)
-
+#define STATUS_RED      (0)
+#define STATUS_GREEN    (1)
+#define STATUS_NORM     (2)
+#define MAIN_WINDOW_START_LN    (2)
+#define INPUT_INDEX_OFFSET      (4)
 WIN_PARAMS main_params, input_params, status_params;
 WINDOW* main_window;
 WINDOW* input_window;
 WINDOW* status_window; 
+
 int main_window_index = MAIN_INDEX_OFFSET;
+int input_box_index = INPUT_INDEX_OFFSET;
 
 static WINDOW* init_window(WIN_PARAMS* params);
 static void init_window_params(void);
@@ -47,6 +51,7 @@ static void init_colors(void);
 static void set_status_colors(void);
 static void reset_status_colors(void);
 static const char* inttostr(int number); 
+static void chtype_to_str(int* ch, char* str, int size);
 
 static void init_window_params(void)  {
 
@@ -121,19 +126,17 @@ void init_gui(void)  {
     
     // Make sure wgetch calls dont block
     nodelay(input_window,true);
-
+    /*
     wmove(main_window, 1, 1);
-    for(unsigned int i=0; i<512; i++)    {
+    for(unsigned int i=0; i<32000; i++)    {
         wattr_on(main_window, COLOR_PAIR(i), NULL);
-        if(i==130)  wprintw(main_window, "\n");
-        //wprintw(main_window, "%i ", i);
         char buf[8] = {'\0'};
         sprintf(&buf[0], "%i ",i);
-        mvwprintw(main_window, 2, 1, "%li", strlen(&buf[0]));
         update_main_window(&buf[0],strlen(&buf[0]) );
         wattr_off(main_window, COLOR_PAIR(i), NULL);
-        wrefresh(main_window);
+        //wrefresh(main_window);
     }
+    */
 }
 
 void update_status_bar(status_bar_t* status_bar) {
@@ -142,8 +145,8 @@ void update_status_bar(status_bar_t* status_bar) {
     
     // Clear then reprint data
     wclear(status_window);
-    mvwprintw(status_window, 1, COLUMN_OFFSET, "Press F1 to exit %i", COLOR_PAIRS);
-    //set_status_colors();
+    mvwprintw(status_window, 1, COLUMN_OFFSET, "Press F1 to exit");
+
     if(status_bar->is_connected)    {
         wattr_on(status_window, COLOR_PAIR(STATUS_GREEN), NULL);
         sprintf(&msg[0], "Connection OK Port: %s  Baudrate: %i", status_bar->port, status_bar->baudrate);
@@ -156,8 +159,8 @@ void update_status_bar(status_bar_t* status_bar) {
         mvwprintw(status_window, 1, (status_params.width - strlen(msg)), "%s", &msg[0]);
         wattroff(status_window, COLOR_PAIR(STATUS_RED));
     }
+    wmove(input_window, 1, input_box_index);
     wrefresh(status_window);
-    //reset_status_colors();
 }
 
 void update_input_box(char* data)   {
@@ -168,9 +171,8 @@ void update_input_box(char* data)   {
 }
 
 void move_input_cursor(int distance)    {
-    int y, x;
-    getyx(input_window, y, x);
-    wmove(input_window, y, x+distance);
+    input_box_index+=distance;
+    wmove(input_window, 1, input_box_index);
 }
 
 int get_input_box_width(void)  {
@@ -191,74 +193,70 @@ bool new_input_box_char(void)   {
 }
 
 void update_main_window(const char *data, int size)  {
+
     int window_height = main_params.height-MAIN_INDEX_OFFSET; 
     int window_width = main_params.width - WINDOW_PADDING;
 
-    unsigned int current_line[window_width];
+    chtype current_line[window_width];
     memset(&current_line[0], '\0', window_width);
-    int new_data[window_width];
-    memset(&new_data[0], '\0', window_width);
     int bytes_written = 0;
-    char msg[64];
-    sprintf(msg, "W: %i H: %i", window_width, window_height);
+
+    //char msg[64];
+    //sprintf(msg, "W: %i H: %i", window_width, window_height);
     //update_input_box(msg);
-    mvwprintw(main_window, 1, 3, "%s",msg );
-    mvwprintw(main_window, 1, 1, "%c",'x');
-    mvwprintw(main_window, 1, window_width, "%c",'x');
-    mvwprintw(main_window, window_height, window_width, "%c",'x');
-    mvwprintw(main_window, window_height, 1, "%c",'x');
+    //mvwprintw(main_window, 1, 3, "%s",msg );
+    //mvwprintw(main_window, 1, 1, "%c",'x');
+    //mvwprintw(main_window, 1, window_width, "%c",'x');
+    //mvwprintw(main_window, window_height, window_width, "%c",'x');
+    //mvwprintw(main_window, window_height, 1, "%c",'x');
 
     while(bytes_written < size) {
+
         while(main_window_index < window_width && bytes_written < size)  {
-            
-            mvwprintw(main_window, window_height, main_window_index,"%c", data[bytes_written]);
-            main_window_index++;
-            bytes_written++;
-            wrefresh(main_window);
+
+            if(data[bytes_written]=='\n')   {
+                
+                main_window_index = MAIN_INDEX_OFFSET; 
+                bytes_written++;
+
+                for(int i=2; i<= window_height; i++)    {
+                    
+                    mvwinchnstr(main_window,i, MAIN_INDEX_OFFSET, &current_line[0], window_width);
+                    wmove(main_window, i-1, MAIN_INDEX_OFFSET);
+                    waddchnstr(main_window, &current_line[0], window_width);
+                    memset(&current_line[0], '\0', window_width);
+                    
+                }
+                for(int i=MAIN_INDEX_OFFSET; i< window_width; i++)    {
+                    mvwprintw(main_window, window_height, i, " ");
+                }
+            }
+
+            else    {
+                mvwprintw(main_window, window_height, main_window_index,"%c", data[bytes_written]);
+                main_window_index++;
+                bytes_written++;
+            }
         }
-           /// update_input_box("x\0");
-        mvwprintw(input_window, 1, 2, "x");
-        (void)wgetch(main_window);
+        
         if(main_window_index==window_width) {
             main_window_index = MAIN_INDEX_OFFSET; 
-            for(int i=1; i< window_height; i++)    {
+
+            for(int i=2; i<= window_height; i++)    {
                 
-                mvwinchnstr(main_window,i, main_window_index, &current_line[0], window_width);
-                mvwprintw(main_window, i-1, main_window_index, "%s",(char*) &current_line[0]);
+                mvwinchnstr(main_window,i, MAIN_INDEX_OFFSET, &current_line[0], window_width);
+                wmove(main_window, i-1, MAIN_INDEX_OFFSET);
+                waddchnstr(main_window, &current_line[0], window_width);
                 memset(&current_line[0], '\0', window_width);
+                
+            }
+            for(int i=MAIN_INDEX_OFFSET; i< window_width; i++)    {
+                mvwprintw(main_window, window_height, i, " ");
             }
         }
 
     }
-    
-       /* 
-
-    for(int i=6; i< window_height; i--)  {
-        mvwinchnstr(main_window,i, COLUMN_OFFSET, &current_line[0], window_width);
-        mvwprintw(main_window, i-1, COLUMN_OFFSET, "%s", &current_line[0]);
-        memset(&current_line[0], '\0', window_width);
-    }
-    if(size > window_width) {
-        int remaining = size;
-        while(remaining > 0)    {
-            for(int i=0; i<window_width && remaining >0; i++)   {
-                new_data[i] = data[i];
-                remaining--;
-            }
-            
-            for(int i=3; i< window_height; i--)  {
-                mvwinchnstr(main_window,i, COLUMN_OFFSET, &current_line[0], window_width);
-                mvwprintw(main_window, i-1, COLUMN_OFFSET, "%s", &current_line[0]);
-                memset(&current_line[0], '\0', window_width);
-            }
-            mvwprintw(main_window, window_height, COLUMN_OFFSET, "%s", &new_data[0]);
-        }
-    }
-    else    {
-        mvwprintw(main_window, window_height, COLUMN_OFFSET, "%s", data);
-    }*/
-
-    //mvwprintw(main_window, window_height, COLUMN_OFFSET, "%s", data);
+    wmove(input_window, 1, input_box_index);
     wrefresh(main_window);
 }
 
@@ -275,19 +273,25 @@ bool screen_size_changed(void)  {
 }
 
 static void init_colors(void)  {
-    for(int j=0; j< 256; j++)   {
 
-    for(int i=0; i< 256; i++)   {
-        if(j==0) init_extended_pair((i+(256*j)), i, -1);
-        else init_extended_pair((i+(256*j)), i, j);
+    for(int j=-1; j< 256; j++)   {
+
+        for(int i=0; i< 256; i++)   {
+
+            init_extended_pair((i+(256*(j+1))), i, j);
+            /*
+            if(j==0) {
+                init_extended_pair((i+(256*j)), i, -1);
+            }
+            else {
+                init_extended_pair((i+(256*j)), i, j);
+            }
+            */
+        }
     }
-    }
-    init_extended_pair(STATUS_NORM, 16, 16);
-    /*
     init_extended_pair(STATUS_NORM, 231, 238);
     init_extended_pair(STATUS_RED,  196, 238);
     init_extended_pair(STATUS_GREEN, 46, 238);
-    */
 }
 
 static void set_status_colors(void) {
@@ -310,4 +314,10 @@ static const char* inttostr(int number)    {
     static char str[16] = {'\0'};
     sprintf(&str[0], "%i", number);
     return str;
+}
+
+static void chtype_to_str(int* ch, char* str, int size) {
+    for (int i=0; i< size; i++) {
+        str[i] = ch[i] & A_CHARTEXT;
+    }
 }
