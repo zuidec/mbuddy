@@ -9,7 +9,7 @@ endif
 # Directories
 
 ROOT_DIR		= ./
-INSTALL_DIR		= /usr/bin/
+INSTALL_DIR		= ~/bin/
 SRC_DIR			= source
 INC_DIR			= include
 OBJ_DIR			= obj
