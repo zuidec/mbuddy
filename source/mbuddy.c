@@ -22,6 +22,7 @@ static bool is_backspace(int key);
 static bool is_special_key(int key);
 static bool exit_key_pressed(void);
 static void serial_update(serial_handle_t serial_port);
+static void refresh_serial_status(serial_handle_t* serial_port,status_bar_t* status);
 static void input_box_update(void); 
 
 const char* cmd = "mbuddy";
@@ -70,6 +71,10 @@ int main(int argc, char *argv[]) {
     if(serial_port >= 0) {
         status.is_connected = true;
     }
+    else    {
+        status.is_connected = false;
+        serial_port_close(serial_port);
+    }
     update_status_bar(&status);    
 
     // Update the input box
@@ -78,11 +83,18 @@ int main(int argc, char *argv[]) {
     input_data = malloc(get_input_box_width());
     memset(&input_data[0], '\0', get_input_box_width());
 
+/*
+ *  Main program loop
+ */
     while(!exit_key_pressed())   {
-        input_box_update(); 
-        serial_update(serial_port);
-    }
 
+        input_box_update(); 
+        refresh_serial_status(&serial_port, &status);
+        if(status.is_connected) {
+            serial_update(serial_port);
+        } 
+        //update_main_window("It's working!\0\n", strlen("It's working!\0\n")+2);
+    }
     serial_port_close(serial_port);
     endwin(); 
     return 0;
@@ -169,4 +181,28 @@ static void input_box_update(void)  {
 
         }
     }
+}
+
+
+static void refresh_serial_status(serial_handle_t* serial_port,status_bar_t* status)    {
+    
+    if(status->is_connected == false)   {
+        *serial_port = serial_port_init(status->port, status->baudrate);
+        if(*serial_port >= 0)   {
+            status->is_connected = true;
+            update_status_bar(status);
+        }
+        else    {
+            serial_port_close(*serial_port);
+        }
+    }
+    else if(status->is_connected ==true)    {
+        if(!serial_is_connected(*serial_port))   {
+            status->is_connected = false;
+            update_status_bar(status);
+            serial_port_close(*serial_port);
+        }
+    }
+
+
 }

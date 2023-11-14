@@ -19,6 +19,9 @@
 #include <sys/stat.h>
 #include <sys/select.h>
 
+// Need to lock port access
+#include <sys/file.h>
+
 #include "nix_serial.h"
 
 
@@ -87,12 +90,25 @@ int serial_port_init(const char* port, int baudrate) {
             printd("\nError number %i: %s\n",errno, strerror(errno));
             return -1;
     }
+
+    flock(serial_port, LOCK_EX | LOCK_NB);
     printd("set!\n");
     return serial_port;
 }
 
 void serial_port_close(serial_handle_t serial)  {
+    flock(serial, LOCK_UN | LOCK_NB);
     close(serial);
+}
+
+bool serial_is_connected(serial_handle_t serial)    {
+
+    struct stat s;
+    fstat(serial, &s);
+    if(s.st_nlink < 1)  {
+        return false;
+    }
+    else return true;
 }
 
 int serial_print(serial_handle_t serial, const char* data, int data_size)  {
@@ -124,7 +140,7 @@ bool serial_data_available(serial_handle_t serial)  {
     FD_SET(serial, &set);
 
     timeout.tv_sec  = 0;
-    timeout.tv_usec = 100;
+    timeout.tv_usec = 10;
 
     return_value = select(serial + 1, &set, NULL, NULL, &timeout);
 

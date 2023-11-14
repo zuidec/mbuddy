@@ -201,7 +201,9 @@ bool new_input_box_char(void)   {
 
 int peek_input_box_char(void)   {
     int ch = wgetch(input_window);
-    ungetch(ch);
+    if(ch!=ERR) {
+        ungetch(ch);
+    }
     return ch;
 }
 
