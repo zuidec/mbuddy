@@ -22,7 +22,7 @@
 #include "nix_serial.h"
 
 
-int init_serial_port(const char* port, int baudrate) {
+int serial_port_init(const char* port, int baudrate) {
 
     printd("Opening serial port...");
     int serial_port = open(port, O_RDWR | O_NOCTTY);
@@ -91,7 +91,7 @@ int init_serial_port(const char* port, int baudrate) {
     return serial_port;
 }
 
-void close_serial_port(serial_handle_t serial)  {
+void serial_port_close(serial_handle_t serial)  {
     close(serial);
 }
 

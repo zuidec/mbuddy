@@ -11,8 +11,8 @@
 
 typedef int serial_handle_t;
 
-serial_handle_t init_serial_port(const char* port, int baudrate);
-void close_serial_port(serial_handle_t serial);
+serial_handle_t serial_port_init(const char* port, int baudrate);
+void serial_port_close(serial_handle_t serial);
 int serial_print(serial_handle_t serial, const char* data, int data_size);
 int serial_println(serial_handle_t serial, const char* data, int data_size);
 int serial_read(serial_handle_t serial, char* buffer, int buffer_size);
