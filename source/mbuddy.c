@@ -15,13 +15,19 @@
 
 #define DEFAULT_BAUDRATE    (115200)
 #define DEFAULT_PORT        ("/dev/ttyUSB0")
+#define SERIAL_BUFFER_SIZE  (256)
 
 static void print_usage(void);
 static bool is_backspace(int key);
 static bool is_special_key(int key);
+static bool exit_key_pressed(void);
+static void serial_update(serial_handle_t serial_port);
+static void input_box_update(void); 
 
 const char* cmd = "mbuddy";
 char* exit_msg = "Press F1 to exit";
+char* input_data;
+int input_index = 0;
 
 int main(int argc, char *argv[]) {
     
@@ -60,7 +66,7 @@ int main(int argc, char *argv[]) {
     // Initialize status bar settings
     status_bar_t status = {port, baudrate, exit_msg, false};
 
-    serial_handle_t  serial_port = init_serial_port(port, baudrate);
+    serial_handle_t  serial_port = serial_port_init(port, baudrate);
     if(serial_port >= 0) {
         status.is_connected = true;
     }
@@ -69,46 +75,15 @@ int main(int argc, char *argv[]) {
     // Update the input box
     update_input_box("");
     
-    // Set up the entry buffer and indexing
-    int input_size = get_input_box_width();
-    char input_data[input_size];
-    memset(&input_data[0], '\0', input_size);
-    int input_index = 0;
-    char serial_input_buffer[256];
-    memset(&serial_input_buffer[0],'\0', 256);
-    int ch = 0;
-    int bytes_read = 0;
+    input_data = malloc(get_input_box_width());
+    memset(&input_data[0], '\0', get_input_box_width());
 
-    while(ch != KEY_F(1))   {
-
-        if(new_input_box_char())    {
-            ch = get_input_box_char();
-            if(input_index < input_size && !is_special_key(ch))   {
-                input_data[input_index] = ch;
-                input_index++;
-                move_input_cursor(1);
-                update_input_box(&input_data[0]);
-            }
-            
-            if(is_backspace(ch) && input_index > 0) {
-                
-                input_index--;
-                input_data[input_index] = '\0';
-                move_input_cursor(-1);
-                update_input_box(&input_data[0]);
-
-            }
-        }
-
-        bytes_read = serial_read(serial_port, &serial_input_buffer[0], sizeof(serial_input_buffer));
-        if(bytes_read > 0)  {
-            update_main_window(&serial_input_buffer[0], bytes_read);
-            bytes_read = 0;
-            memset(&serial_input_buffer[0],'\0', 256);
-        }
+    while(!exit_key_pressed())   {
+        input_box_update(); 
+        serial_update(serial_port);
     }
 
-    close_serial_port(serial_port);
+    serial_port_close(serial_port);
     endwin(); 
     return 0;
 }
@@ -141,3 +116,57 @@ static bool is_special_key(int key) {
     return true;
  }
 
+static bool exit_key_pressed(void)  {
+    int key = 0;
+
+    // Check the next available char if available and see if its the exit key
+    if(new_input_box_char())    {
+        key = peek_input_box_char();
+        if(key==KEY_F(1))   {
+            return true;
+        }
+    }
+
+    // Else
+    return false;
+}
+
+static void serial_update(serial_handle_t serial_port)    {
+                
+    int bytes_read = 0;
+    char serial_input_buffer[SERIAL_BUFFER_SIZE];
+    memset(&serial_input_buffer[0],'\0', SERIAL_BUFFER_SIZE);
+
+    if(serial_data_available(serial_port))   {
+
+        bytes_read = serial_read(serial_port, &serial_input_buffer[0], SERIAL_BUFFER_SIZE);
+        update_main_window(&serial_input_buffer[0], bytes_read);
+        bytes_read = 0;
+        memset(&serial_input_buffer[0],'\0', SERIAL_BUFFER_SIZE);
+    }
+}
+
+static void input_box_update(void)  {
+
+    int ch = 0;
+    int input_size = get_input_box_width();
+
+    if(new_input_box_char())    {
+        ch = get_input_box_char();
+        if(input_index < input_size && !is_special_key(ch))   {
+            input_data[input_index] = ch;
+            input_index++;
+            move_input_cursor(1);
+            update_input_box(&input_data[0]);
+        }
+        
+        if(is_backspace(ch) && input_index > 0) {
+            
+            input_index--;
+            input_data[input_index] = '\0';
+            move_input_cursor(-1);
+            update_input_box(&input_data[0]);
+
+        }
+    }
+}

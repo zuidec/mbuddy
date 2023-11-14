@@ -63,6 +63,7 @@ void move_input_cursor(int distance);
 int get_input(char* buffer);
 int get_input_box_width(void);
 int get_input_box_char(void);
+int peek_input_box_char(void);
 bool new_input_box_char(void);
 bool screen_size_changed(void);
 void update_main_window(const char* data, int size);

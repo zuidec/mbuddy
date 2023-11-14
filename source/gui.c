@@ -199,6 +199,12 @@ bool new_input_box_char(void)   {
     return true;
 }
 
+int peek_input_box_char(void)   {
+    int ch = wgetch(input_window);
+    ungetch(ch);
+    return ch;
+}
+
 void update_main_window(const char *data, int size)  {
     
     // Get the available height/width for printing
