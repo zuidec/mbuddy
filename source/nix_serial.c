@@ -8,10 +8,16 @@
 #include <stdio.h>
 #include <string.h>
 
+// Needed to access serial devices
 #include <fcntl.h>
 #include <errno.h>
 #include <termios.h>
 #include <unistd.h>
+
+// Needed for select() timeout 
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/select.h>
 
 #include "nix_serial.h"
 
@@ -68,7 +74,7 @@ int init_serial_port(const char* port, int baudrate) {
     tty.c_oflag &= ~ONLCR;
 
     // Set timeout to 1ms to prevent blocking
-    tty.c_cc[VTIME] = 1;
+    tty.c_cc[VTIME] = 0;
     tty.c_cc[VMIN] = 0;
 
     printd("Setting baudrate %i... ", baudrate);
@@ -107,4 +113,26 @@ int serial_readln(serial_handle_t serial, char* buffer, int buffer_size)  {
     int bytes_received = 0;
 
     return bytes_received;
+}
+
+bool serial_data_available(serial_handle_t serial)  {
+    fd_set set;
+    struct timeval timeout;
+    int return_value;
+
+    FD_ZERO(&set);
+    FD_SET(serial, &set);
+
+    timeout.tv_sec  = 0;
+    timeout.tv_usec = 100;
+
+    return_value = select(serial + 1, &set, NULL, NULL, &timeout);
+
+    if(return_value <= 0)   {
+        return false;
+    }
+    else    {
+        return true;
+    }
+    
 }
