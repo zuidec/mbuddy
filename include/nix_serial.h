@@ -2,9 +2,9 @@
 #define NIX_SERIAL_H
 
 #ifdef  DEBUG
-#define printd printf
+#define printd(...)      printf(__VA_ARGS__)
 #else
-#define printd /*printf*/
+#define printd(...)      /*printf(__VA_ARGS__)*/
 #endif
 
 typedef int serial_handle_t;

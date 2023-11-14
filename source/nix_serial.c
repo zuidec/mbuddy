@@ -67,8 +67,8 @@ int init_serial_port(const char* port, int baudrate) {
     tty.c_oflag &= ~OPOST;
     tty.c_oflag &= ~ONLCR;
 
-    // Set timeout to 10ms to prevent blocking
-    tty.c_cc[VTIME] = 10;
+    // Set timeout to 1ms to prevent blocking
+    tty.c_cc[VTIME] = 1;
     tty.c_cc[VMIN] = 0;
 
     printd("Setting baudrate %i... ", baudrate);
