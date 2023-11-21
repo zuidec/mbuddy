@@ -5,6 +5,7 @@
  *	Created by zuidec on 11/11/23
  */
 
+#include <curses.h>
 #include <ncursesw/ncurses.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -23,12 +24,13 @@ static bool is_special_key(int key);
 static bool exit_key_pressed(void);
 static void serial_update(serial_handle_t serial_port);
 static void refresh_serial_status(serial_handle_t* serial_port,status_bar_t* status);
-static void input_box_update(void); 
+static void update_user_input(serial_handle_t serial_port,status_bar_t* status); 
 
-const char* cmd = "mbuddy";
-char* exit_msg = "Press F1 to exit";
+const char* cmd         = "mbuddy";
+char* exit_msg          = "Press F1 to exit";
+int input_index         = 0;
+int input_size          = 0;
 char* input_data;
-int input_index = 0;
 
 int main(int argc, char *argv[]) {
     
@@ -79,24 +81,26 @@ int main(int argc, char *argv[]) {
 
     // Update the input box
     update_input_box("");
-    
-    input_data = malloc(get_input_box_width());
-    memset(&input_data[0], '\0', get_input_box_width());
+    input_size = get_input_box_width(); 
+    input_data = malloc(input_size);
+    memset(&input_data[0], '\0', input_size);
 
 /*
  *  Main program loop
  */
     while(!exit_key_pressed())   {
 
-        input_box_update(); 
         refresh_serial_status(&serial_port, &status);
+        update_user_input(serial_port ,&status); 
         if(status.is_connected) {
             serial_update(serial_port);
         } 
         //update_main_window("It's working!\0\n", strlen("It's working!\0\n")+2);
     }
+
     serial_port_close(serial_port);
     endwin(); 
+
     return 0;
 }
 
@@ -152,17 +156,18 @@ static void serial_update(serial_handle_t serial_port)    {
     if(serial_data_available(serial_port))   {
 
         bytes_read = serial_read(serial_port, &serial_input_buffer[0], SERIAL_BUFFER_SIZE);
+        
         update_main_window(&serial_input_buffer[0], bytes_read);
         bytes_read = 0;
         memset(&serial_input_buffer[0],'\0', SERIAL_BUFFER_SIZE);
     }
 }
 
-static void input_box_update(void)  {
+static void update_user_input(serial_handle_t serial_port, status_bar_t* status)  {
 
     int ch = 0;
-    int input_size = get_input_box_width();
 
+    // First check if there is a new character available
     if(new_input_box_char())    {
         ch = get_input_box_char();
         if(input_index < input_size && !is_special_key(ch))   {
@@ -172,13 +177,38 @@ static void input_box_update(void)  {
             update_input_box(&input_data[0]);
         }
         
+        // Remove last character if backspace is pressed
         if(is_backspace(ch) && input_index > 0) {
-            
+           
+            // Decrement the index and replace that character with a null
             input_index--;
             input_data[input_index] = '\0';
             move_input_cursor(-1);
             update_input_box(&input_data[0]);
 
+        }
+        
+        // Send data to the main window and to the serial device when enter is pressed
+        if(ch=='\n')   {
+            input_data[input_index] = '\n';
+
+            // Only attempt a print if serial device is connected
+            if(status->is_connected)    {
+                serial_print(serial_port, &input_data[0], input_index+1);
+            }
+
+            // Change text color and add >>> to distinguish input from output
+            // and print to main window
+            main_window_attron(COLOR_PAIR(50));
+            update_main_window(">>> ", strlen(">>> "));
+            update_main_window(&input_data[0], input_index+1);
+            main_window_attroff(COLOR_PAIR(50));
+            
+            // Clear the buffer, input box, and reset the index
+            memset(&input_data[0], '\0', input_size);
+            update_input_box(&input_data[0]);
+            move_input_cursor(0-input_index);
+            input_index = 0;
         }
     }
 }
