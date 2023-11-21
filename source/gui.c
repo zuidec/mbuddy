@@ -277,6 +277,66 @@ void update_baud_setting(status_bar_t *status_bar)  {
 }
 
 void update_port_setting(status_bar_t *status_bar)  {
+ 
+    WINDOW* temp_entry_window;
+    temp_entry_window = newwin(ENTRY_WINDOW_HEIGHT, ENTRY_WINDOW_WIDTH, ENTRY_WINDOW_Y, ENTRY_WINDOW_X );
+    wbkgd(temp_entry_window, COLOR_PAIR(ENTRY_WINDOW_BKGRD));
+    box_set(temp_entry_window, 0, 0);
+    wattr_on(temp_entry_window, COLOR_PAIR(ENTRY_WINDOW_BKGRD), NULL);
+    mvwprintw(temp_entry_window, 2, 2, "New port: ");
+    wattr_off(temp_entry_window, COLOR_PAIR(ENTRY_WINDOW_BKGRD), NULL);
+    keypad(temp_entry_window, true);
+    nodelay(temp_entry_window, true);
+
+    int input_index         = 0;
+    int input_size          = ENTRY_WINDOW_WIDTH - 15;
+    char* input_data        = malloc(input_size+1);
+    int ch                  = 0;
+    memset(&input_data[0], '\0', input_size+1);
+
+    wattr_on(temp_entry_window, A_STANDOUT, NULL);
+    while(!is_enter_key(ch)) {
+        ch=wgetch(temp_entry_window);
+        
+        // First check if there is a new character available
+        if(ch==ERR || (is_special_key(ch) && !is_enter_key(ch) && !is_backspace_key(ch)))   {
+            if(ch==KEY_F(1))    {
+                ungetch(ch);
+                return;
+            }
+            ch = 0;
+        }
+
+        else if(input_index < input_size && !is_special_key(ch))   {
+            input_data[input_index] = ch;
+            input_index++;
+            wprintw(temp_entry_window, "%c", ch);
+        }
+        
+        // Remove last character if backspace is pressed
+        else if(is_backspace_key(ch) && input_index > 0) {
+            // Decrement the index and replace that character with a null
+            input_index--;
+            input_data[input_index] = '\0';
+            wattr_off(temp_entry_window, A_STANDOUT, NULL);
+            wprintw(temp_entry_window, "\b \b");
+            wattr_on(temp_entry_window, A_STANDOUT, NULL);
+        }
+        
+        wrefresh(temp_entry_window);
+    }
+    
+    // Free resources by deleting temp window
+    wattr_off(temp_entry_window, A_STANDOUT, NULL);
+    delwin(temp_entry_window);
+
+    // Convert char* baud into an int and update status bar
+    status_bar->port= input_data;
+    update_status_bar(status_bar); 
+    
+    // Refresh the main window to remove temp window from screen
+    touchwin(main_window);
+    wrefresh(main_window);
 
 }
 
@@ -356,7 +416,7 @@ void update_main_window(const char *data, int size)  {
                 }
 
                 // Clear the last line before printing more characters
-                for(int i=MAIN_INDEX_OFFSET; i< window_width; i++)    {
+                for(int i=MAIN_INDEX_OFFSET; i<= window_width; i++)    {
                     mvwprintw(main_window, window_height, i, " ");
                 }
             }
@@ -383,7 +443,7 @@ void update_main_window(const char *data, int size)  {
             }
 
             // Clear the last line before printing more characters
-            for(int i=MAIN_INDEX_OFFSET; i< window_width; i++)    {
+            for(int i=MAIN_INDEX_OFFSET; i<= window_width; i++)    {
                 mvwprintw(main_window, window_height, i, " ");
             }
         }
@@ -498,7 +558,7 @@ bool baud_menu_key_pressed(void) {
 
     int key = 0;
     key = peek_input_box_char();
-    if(key==KEY_F(2))   {
+    if(key==KEY_F(3))   {
         return true;
     }
     return false;
@@ -508,7 +568,7 @@ bool port_menu_key_pressed(void) {
 
     int key = 0;
     key = peek_input_box_char();
-    if(key==KEY_F(3))   {
+    if(key==KEY_F(2))   {
         return true;
     }
     return false;
