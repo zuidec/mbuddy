@@ -19,6 +19,7 @@ int serial_println(serial_handle_t serial, const char* data, int data_size);
 int serial_read(serial_handle_t serial, char* buffer, int buffer_size);
 int serial_readln(serial_handle_t serial, char* buffer, int buffer_size);
 bool serial_data_available(serial_handle_t serial);
+void serial_update_baudrate(serial_handle_t serial, int baudrate);
 
 #endif
 

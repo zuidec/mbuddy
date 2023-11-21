@@ -152,3 +152,18 @@ bool serial_data_available(serial_handle_t serial)  {
     }
     
 }
+
+void serial_update_baudrate(serial_handle_t serial, int baudrate) {
+    struct termios tty;
+    if(tcgetattr(serial, &tty)!=0)  {
+        return;
+    }
+    int current_baud = cfgetispeed(&tty); 
+    if(current_baud==baudrate)  {
+        return;
+    }
+    cfsetspeed(&tty, baudrate);
+    tcsetattr(serial, TCSANOW, &tty);
+
+}
+
