@@ -19,9 +19,6 @@
 #define SERIAL_BUFFER_SIZE  (256)
 
 static void print_usage(void);
-static bool is_backspace(int key);
-static bool is_special_key(int key);
-static bool exit_key_pressed(void);
 static void serial_update(serial_handle_t serial_port);
 static void refresh_serial_status(serial_handle_t* serial_port,status_bar_t* status);
 static void update_user_input(serial_handle_t serial_port,status_bar_t* status); 
@@ -89,13 +86,26 @@ int main(int argc, char *argv[]) {
  *  Main program loop
  */
     while(!exit_key_pressed())   {
-
+        
         refresh_serial_status(&serial_port, &status);
         update_user_input(serial_port ,&status); 
         if(status.is_connected) {
             serial_update(serial_port);
         } 
         //update_main_window("It's working!\0\n", strlen("It's working!\0\n")+2);
+        if(baud_menu_key_pressed()) {
+            update_baud_setting(&status);
+            serial_update_baudrate(serial_port, status.baudrate);
+        }
+        if(port_menu_key_pressed()) {
+            update_port_setting(&status);
+            serial_port_close(serial_port);
+            serial_port = serial_port_init(status.port, status.baudrate);
+            if(serial_port < 0) {
+                serial_port_close(serial_port);
+                status.is_connected = false;
+            }
+        }
     }
 
     serial_port_close(serial_port);
@@ -112,40 +122,6 @@ static void print_usage(void)   {
     printf("\t-b baudrate\t\tDefault is %i\n", DEFAULT_BAUDRATE); 
 }
 
-static bool is_backspace(int key)  {
-    
-    if(key==KEY_BACKSPACE) {
-        return true;
-    }
-    if(key==8) {
-        return true;
-    }
-
-    return false;
-}
-
-static bool is_special_key(int key) {
-    if(key>=32 && key<=127) {
-        return false;
-    }
-    
-    return true;
- }
-
-static bool exit_key_pressed(void)  {
-    int key = 0;
-
-    // Check the next available char if available and see if its the exit key
-    if(new_input_box_char())    {
-        key = peek_input_box_char();
-        if(key==KEY_F(1))   {
-            return true;
-        }
-    }
-
-    // Else
-    return false;
-}
 
 static void serial_update(serial_handle_t serial_port)    {
                 
@@ -168,7 +144,7 @@ static void update_user_input(serial_handle_t serial_port, status_bar_t* status)
     int ch = 0;
 
     // First check if there is a new character available
-    if(new_input_box_char())    {
+    if(new_char_available(input_win()))    {
         ch = get_input_box_char();
         if(input_index < input_size && !is_special_key(ch))   {
             input_data[input_index] = ch;
@@ -178,7 +154,7 @@ static void update_user_input(serial_handle_t serial_port, status_bar_t* status)
         }
         
         // Remove last character if backspace is pressed
-        if(is_backspace(ch) && input_index > 0) {
+        if(is_backspace_key(ch) && input_index > 0) {
            
             // Decrement the index and replace that character with a null
             input_index--;
@@ -189,7 +165,7 @@ static void update_user_input(serial_handle_t serial_port, status_bar_t* status)
         }
         
         // Send data to the main window and to the serial device when enter is pressed
-        if(ch=='\n')   {
+        if(is_enter_key(ch))   {
             input_data[input_index] = '\n';
 
             // Only attempt a print if serial device is connected
@@ -236,3 +212,4 @@ static void refresh_serial_status(serial_handle_t* serial_port,status_bar_t* sta
 
 
 }
+
