@@ -195,6 +195,10 @@ bool new_input_box_char(void)   {
     if(ch==ERR) {
         return false;
     }
+    if(is_interface_key(ch))    {
+        ungetch(ch);
+        return false;
+    }
     ungetch(ch);
     return true;
 }
@@ -279,6 +283,15 @@ void update_main_window(const char *data, int size)  {
     wrefresh(main_window);
 }
 
+
+void main_window_attroff(attr_t attribute)  {
+    wattr_off(main_window, attribute, NULL);
+}
+
+void main_window_attron(attr_t attribute)  {
+    wattr_on(main_window, attribute, NULL);
+}
+
 bool screen_size_changed(void)  {
     
     int y, x;
@@ -333,4 +346,19 @@ static void chtype_to_str(int* ch, char* str, int size) {
     for (int i=0; i< size; i++) {
         str[i] = ch[i] & A_CHARTEXT;
     }
+}
+
+bool is_interface_key(int key)  {
+    
+    switch(key) {
+        case KEY_F(1):  
+            return true;
+        case KEY_F(2):  
+            return true;
+        case KEY_F(3):  
+            return true;
+        default:
+            break;
+    }
+    return false;
 }

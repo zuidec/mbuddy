@@ -12,6 +12,7 @@
  *  Includes
  */
 
+#include <curses.h>
 #include <ncursesw/ncurses.h>
 
 
@@ -67,7 +68,12 @@ int peek_input_box_char(void);
 bool new_input_box_char(void);
 bool screen_size_changed(void);
 void update_main_window(const char* data, int size);
+void main_window_attron(attr_t attribute);
+void main_window_attroff(attr_t attribute);
 void clear_main(void);
+
+
+bool is_interface_key(int key);
 
 #endif  // END GUI_H
 
