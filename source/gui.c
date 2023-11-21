@@ -1,13 +1,19 @@
 /*
  *	gui.c
- *	Function to create and update mbuddy GUI
+ *	Functions to create and update mbuddy GUI
  *
  *	Created by zuidec on 11/11/23
+ */
+
+
+/*
+ *  Includes
  */
 
 #include <bits/stdint-uintn.h>
 #include <curses.h>
 #include <ncursesw/ncurses.h>
+#include <menu.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <wchar.h>
@@ -15,35 +21,49 @@
 
 #include "gui.h"
 
-#define BLACK           (0)
-#define BLUE            (1)
-#define GREEN           (2)
-#define CYAN            (3)
-#define RED             (4)
-#define MAGENTA         (5)
-#define BROWN           (6)
-#define WHITE           (7)
-#define B_BLACK         (8)
-#define B_BLUE          (9)
-#define B_GREEN         (10)
-#define B_CYAN          (11)
-#define B_RED           (12)
-#define B_MAGENTA       (13)
-#define YELLOW          (14)
-#define B_WHITE         (15)
 
-#define STATUS_RED      (3)
-#define STATUS_GREEN    (1)
-#define STATUS_NORM     (2)
+/*
+ *  Defines
+ */
+
+#define BLACK                   (0)
+#define BLUE                    (1)
+#define GREEN                   (2)
+#define CYAN                    (3)
+#define RED                     (4)
+#define MAGENTA                 (5)
+#define BROWN                   (6)
+#define WHITE                   (7)
+#define B_BLACK                 (8)
+#define B_BLUE                  (9)
+#define B_GREEN                 (10)
+#define B_CYAN                  (11)
+#define B_RED                   (12)
+#define B_MAGENTA               (13)
+#define YELLOW                  (14)
+#define B_WHITE                 (15)
+
+#define STATUS_RED              (3)
+#define STATUS_GREEN            (1)
+#define STATUS_NORM             (2)
+#define ENTRY_WINDOW_BKGRD      (4)
+
 #define MAIN_WINDOW_START_LN    (2)
 #define INPUT_INDEX_OFFSET      (4)
-WIN_PARAMS main_params, input_params, status_params;
-WINDOW* main_window;
-WINDOW* input_window;
-WINDOW* status_window; 
 
-int main_window_index = MAIN_INDEX_OFFSET;
-int input_box_index = INPUT_INDEX_OFFSET;
+#define ENTRY_WINDOW_HEIGHT     (5)
+#define ENTRY_WINDOW_WIDTH      (getmaxx(stdscr)/3)
+#define ENTRY_WINDOW_Y          ((getmaxy(stdscr)/2)-(ENTRY_WINDOW_HEIGHT/2))
+#define ENTRY_WINDOW_X          ((getmaxx(stdscr)/2)-(ENTRY_WINDOW_WIDTH/2))
+
+#define INPUT_WINDOW            (input_window)
+#define MAIN_WINDOW             (main_window)
+#define STATUS_WINDOW           (status_window)
+
+
+/*
+ *  Static function declarations 
+ */
 
 static WINDOW* init_window(WIN_PARAMS* params);
 static void init_window_params(void);
@@ -52,6 +72,27 @@ static void set_status_colors(void);
 static void reset_status_colors(void);
 static const char* inttostr(int number); 
 static void chtype_to_str(int* ch, char* str, int size);
+
+
+/*
+ *  Structs. unions, global variables
+ */
+
+WIN_PARAMS main_params, input_params, status_params;
+WINDOW* main_window;
+WINDOW* input_window;
+WINDOW* status_window; 
+ITEM** my_items;
+MENU* baud_menu;
+MENU* port_menu;
+
+int main_window_index   = MAIN_INDEX_OFFSET;
+int input_box_index     = INPUT_INDEX_OFFSET;
+
+
+/*
+ *  Functions
+ */
 
 static void init_window_params(void)  {
 
@@ -88,6 +129,8 @@ static WINDOW* init_window(WIN_PARAMS* params)   {
 
     // Use window parameters to create and return a pointer to a new windown
     window = newwin(params->height, params->width, params->start_y, params->start_x);
+
+    // Add a box to all windows except for the status bar
     if(params->height!=STATUS_BAR_HEIGHT)   {
         box(window, 0, 0); 
     }
@@ -170,6 +213,73 @@ void update_status_bar(status_bar_t* status_bar) {
     wrefresh(status_window);
 }
 
+void update_baud_setting(status_bar_t *status_bar)  {
+     
+    WINDOW* temp_entry_window;
+    temp_entry_window = newwin(ENTRY_WINDOW_HEIGHT, ENTRY_WINDOW_WIDTH, ENTRY_WINDOW_Y, ENTRY_WINDOW_X );
+    wbkgd(temp_entry_window, COLOR_PAIR(ENTRY_WINDOW_BKGRD));
+    box_set(temp_entry_window, 0, 0);
+    wattr_on(temp_entry_window, COLOR_PAIR(ENTRY_WINDOW_BKGRD), NULL);
+    mvwprintw(temp_entry_window, 2, 2, "New baud: ");
+    wattr_off(temp_entry_window, COLOR_PAIR(ENTRY_WINDOW_BKGRD), NULL);
+    keypad(temp_entry_window, true);
+    nodelay(temp_entry_window, true);
+
+    int input_index         = 0;
+    int input_size          = ENTRY_WINDOW_WIDTH - 15;
+    char* input_data        = malloc(input_size+1);
+    int ch                  = 0;
+    memset(&input_data[0], '\0', input_size+1);
+
+    wattr_on(temp_entry_window, A_STANDOUT, NULL);
+    while(!is_enter_key(ch)) {
+        ch=wgetch(temp_entry_window);
+        
+        // First check if there is a new character available
+        if(ch==ERR || (is_special_key(ch) && !is_enter_key(ch) && !is_backspace_key(ch)))   {
+            if(ch==KEY_F(1))    {
+                ungetch(ch);
+                return;
+            }
+            ch = 0;
+        }
+
+        else if(input_index < input_size && is_number_key(ch))   {
+            input_data[input_index] = ch;
+            input_index++;
+            wprintw(temp_entry_window, "%c", ch);
+        }
+        
+        // Remove last character if backspace is pressed
+        else if(is_backspace_key(ch) && input_index > 0) {
+            // Decrement the index and replace that character with a null
+            input_index--;
+            input_data[input_index] = '\0';
+            wattr_off(temp_entry_window, A_STANDOUT, NULL);
+            wprintw(temp_entry_window, "\b \b");
+            wattr_on(temp_entry_window, A_STANDOUT, NULL);
+        }
+        
+        wrefresh(temp_entry_window);
+    }
+    
+    // Free resources by deleting temp window
+    wattr_off(temp_entry_window, A_STANDOUT, NULL);
+    delwin(temp_entry_window);
+
+    // Convert char* baud into an int and update status bar
+    status_bar->baudrate = atoi(input_data);
+    update_status_bar(status_bar); 
+    
+    // Refresh the main window to remove temp window from screen
+    touchwin(main_window);
+    wrefresh(main_window);
+}
+
+void update_port_setting(status_bar_t *status_bar)  {
+
+}
+
 void update_input_box(char* data)   {
     
     werase(input_window);
@@ -190,8 +300,8 @@ int get_input_box_char(void)   {
     return  wgetch(input_window);
 }
 
-bool new_input_box_char(void)   {
-    int ch = wgetch(input_window); 
+bool new_char_available(WINDOW* window)   {
+    int ch = wgetch(window); 
     if(ch==ERR) {
         return false;
     }
@@ -318,28 +428,7 @@ static void init_colors(void)  {
     init_extended_pair(STATUS_NORM, 231, 238);
     init_extended_pair(STATUS_RED,  196, 238);
     init_extended_pair(STATUS_GREEN, 46, 238);
-}
-
-static void set_status_colors(void) {
-
-    // Set status bar color pairs
-    init_pair(STATUS_NORM, 231, 238);
-    init_pair(STATUS_RED, 160, 238);
-    init_pair(STATUS_GREEN, 46, 238);
-}
-
-static void reset_status_colors(void) {
-
-    // Set status bar color pairs
-    init_pair(STATUS_NORM, STATUS_NORM, -1);
-    init_pair(STATUS_RED, STATUS_RED, -1);
-    init_pair(STATUS_GREEN, STATUS_GREEN, -1);
-}
-
-static const char* inttostr(int number)    {
-    static char str[16] = {'\0'};
-    sprintf(&str[0], "%i", number);
-    return str;
+    init_extended_pair(ENTRY_WINDOW_BKGRD, 250, 235);
 }
 
 static void chtype_to_str(int* ch, char* str, int size) {
@@ -361,4 +450,78 @@ bool is_interface_key(int key)  {
             break;
     }
     return false;
+}
+
+bool is_enter_key(int key)  {
+    
+    if(key==KEY_ENTER) {
+        return true;
+    }
+    if(key=='\n') {
+        return true;
+    }
+
+    return false;
+}
+
+bool is_backspace_key(int key)  {
+    
+    if(key==KEY_BACKSPACE || key==8 || key=='\b') {
+        return true;
+    }
+
+    return false;
+}
+
+bool is_special_key(int key) {
+    if(key>=32 && key<=127) {
+        return false;
+    }
+    
+    return true;
+ }
+
+bool exit_key_pressed(void)  {
+    int key = 0;
+
+    // Check the next available char if available and see if its the exit key
+    key = peek_input_box_char();
+    if(key==KEY_F(1))   {
+        return true;
+    }
+
+    // Else
+    return false;
+}
+
+bool baud_menu_key_pressed(void) {
+
+    int key = 0;
+    key = peek_input_box_char();
+    if(key==KEY_F(2))   {
+        return true;
+    }
+    return false;
+}
+
+bool port_menu_key_pressed(void) {
+
+    int key = 0;
+    key = peek_input_box_char();
+    if(key==KEY_F(3))   {
+        return true;
+    }
+    return false;
+}
+
+bool is_number_key(int key) {
+
+    if(key >= 47 && key <=57) {
+        return true;
+    }
+    return false;
+}
+
+WINDOW* input_win(void) {
+    return input_window;
 }

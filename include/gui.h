@@ -59,21 +59,31 @@ typedef struct status_bar_t    {
 void init_gui(void);
 void close_gui(void);
 void update_status_bar(status_bar_t* status_bar);
+void update_baud_setting(status_bar_t *status_bar);
+void update_port_setting(status_bar_t *status_bar);
 void update_input_box(char* data);
 void move_input_cursor(int distance);
 int get_input(char* buffer);
 int get_input_box_width(void);
 int get_input_box_char(void);
 int peek_input_box_char(void);
-bool new_input_box_char(void);
+bool new_char_available(WINDOW* window);
 bool screen_size_changed(void);
 void update_main_window(const char* data, int size);
 void main_window_attron(attr_t attribute);
 void main_window_attroff(attr_t attribute);
 void clear_main(void);
-
-
+bool is_backspace_key(int key);
+bool is_special_key(int key);
+bool is_enter_key(int key);
+bool is_number_key(int key);
+bool baud_menu_key_pressed(void);
+bool port_menu_key_pressed(void);
+bool exit_key_pressed(void);
 bool is_interface_key(int key);
+WINDOW* input_win(void);
+
+
 
 #endif  // END GUI_H
 
