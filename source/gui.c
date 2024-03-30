@@ -13,7 +13,7 @@
 #include <bits/stdint-uintn.h>
 #include <curses.h>
 #include <ncursesw/ncurses.h>
-#include <menu.h>
+#include <ncursesw/menu.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <wchar.h>
