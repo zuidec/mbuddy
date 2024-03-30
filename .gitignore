@@ -6,3 +6,5 @@ serialtest.c
 compile_commands.json
 buildtest.sh
 .cache
+*.gz
+*.tar
